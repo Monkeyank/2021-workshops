@@ -122,7 +122,7 @@ suspend fun Subsystems.intakeBalls() = startChoreo("Intake Balls") {
 
 suspend fun Subsystems.shootAll(speed: DutyCycle) = startChoreo("Shoot All") {
     choreography {
-        val j = launch { shooterHood?.set(ShooterHoodState.Up) }
+        val j = launch { /* TODO: Add statement setting hood up */ }
         launch { leds?.set(Color.GREEN) }
         try {
             delay(0.3.Second)

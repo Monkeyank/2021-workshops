@@ -56,6 +56,9 @@ suspend fun TurretComponent.manualPrecisionOverride(operator: OperatorHardware) 
         controller { PercentOutput(hardware.escConfig, precision) }
     }
 
-suspend fun ShooterHoodComponent.set(target: ShooterHoodState) = startRoutine("Set") {
-    controller { target }
-}
+/*
+    TODO:
+        - Create a routine to set the shooter hood state
+        - Function should take ShooterHoodState and set the pneumatic to that state
+        - Hint: need a controller { }
+ */
