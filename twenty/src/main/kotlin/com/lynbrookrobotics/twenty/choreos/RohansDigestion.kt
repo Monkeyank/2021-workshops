@@ -4,14 +4,12 @@ import com.lynbrookrobotics.kapuchin.control.math.*
 import com.lynbrookrobotics.kapuchin.logging.*
 import com.lynbrookrobotics.kapuchin.logging.Level.*
 import com.lynbrookrobotics.kapuchin.routines.*
-import com.lynbrookrobotics.kapuchin.timing.*
 import com.lynbrookrobotics.twenty.Subsystems
 import com.lynbrookrobotics.twenty.routines.*
 import com.lynbrookrobotics.twenty.subsystems.carousel.CarouselSlot
 import com.lynbrookrobotics.twenty.subsystems.intake.IntakeSliderState
-import com.lynbrookrobotics.twenty.subsystems.shooter.*
+import com.lynbrookrobotics.twenty.subsystems.shooter.ShooterHoodState
 import info.kunalsheth.units.generated.*
-import info.kunalsheth.units.math.*
 import kotlinx.coroutines.*
 import java.awt.Color
 
@@ -21,11 +19,10 @@ suspend fun Subsystems.digestionTeleop() = startChoreo("Digestion Teleop") {
 
     val eatBalls by driver.eatBalls.readEagerly().withoutStamps
     val pukeBallsIntakeIn by driver.pukeBallsIntakeIn.readEagerly().withoutStamps
+
     val pukeBallsIntakeOut by driver.pukeBallsIntakeOut.readEagerly().withoutStamps
 
     val centerTurret by operator.centerTurret.readEagerly().withoutStamps
-    val unjamFeeder by operator.unjamFeeder.readEagerly().withoutStamps
-    val aim by operator.aim.readEagerly().withoutStamps
     val shootFast by operator.shootFast.readEagerly().withoutStamps
     val shootSlow by operator.shootSlow.readEagerly().withoutStamps
 
@@ -41,9 +38,6 @@ suspend fun Subsystems.digestionTeleop() = startChoreo("Digestion Teleop") {
     val carouselLeft by driver.carouselLeft.readEagerly().withoutStamps
     val carouselRight by driver.carouselRight.readEagerly().withoutStamps
 
-    val increaseFlywheelSpeed by driver.increaseFlywheelSpeed.readEagerly().withoutStamps
-    val decreaseFlywheelSpeed by driver.decreaseFlywheelSpeed.readEagerly().withoutStamps
-
     choreography {
         if (!carousel.hardware.isZeroed) {
             withTimeout(2.Second) { carousel.rezero() }
@@ -57,15 +51,16 @@ suspend fun Subsystems.digestionTeleop() = startChoreo("Digestion Teleop") {
                 intakeRollers?.set(-100.Percent) ?: freeze()
             },
 
-            { centerTurret } to { turret?.set(0.Degree) ?: freeze() },
-            { unjamFeeder } to {
-                launch { feederRoller?.let { it.set(it.feedSpeed) } }
-                launch { shooterHood?.set (ShooterHoodState.Up)}
-                launch { flywheel?.set(2500.Rpm)}
-                freeze()
-            },
-            { aim && !shift } to { visionTrackTarget() },
-            { aim && shift } to { flashlight?.set(FlashlightState.On) },
+            /*
+                TODO: Set turret to the zero position
+                Hint(s):
+                  - Button name is: centerTurret
+                  - Think: What position in degrees is the turret when Zeroed?
+                  - If the routine is null then run freeze()
+
+             */
+            // TODO: REPLACE ME { buttonName } to { what To Do, but if null call freeze() }
+
             { shootFast } to { shootAll(carousel.shootFastSpeed) },
             { shootSlow } to { shootAll(carousel.shootSlowSpeed) },
 
@@ -75,11 +70,9 @@ suspend fun Subsystems.digestionTeleop() = startChoreo("Digestion Teleop") {
             { presetFar } to { flywheel?.let { spinUpShooter(it.presetFar) } ?: freeze() },
 
             { !turretManual.isZero && turretPrecisionManual.isZero } to {
-                scope.launch { withTimeout(3.Second) { flashlight?.set(FlashlightState.On) } }
                 turret?.manualOverride(operator) ?: freeze()
             },
             { turretManual.isZero && !turretPrecisionManual.isZero } to {
-                scope.launch { withTimeout(3.Second) { flashlight?.set(FlashlightState.On) } }
                 turret?.manualPrecisionOverride(operator) ?: freeze()
             },
 
@@ -92,49 +85,6 @@ suspend fun Subsystems.digestionTeleop() = startChoreo("Digestion Teleop") {
                 carousel.set(carousel.hardware.nearestSlot() - 1.CarouselSlot,
                     0.Degree)
             },
-
-            { increaseFlywheelSpeed } to {
-                flywheel?.changeFlywheelSpeed(true)
-                delay(1.Second)
-            },
-            { decreaseFlywheelSpeed } to {
-                flywheel?.changeFlywheelSpeed(false)
-                delay(1.Second)
-            }
-        )
-    }
-}
-
-suspend fun Subsystems.digestionTest() = startChoreo("Digestion Test") {
-
-    val turretManual by operator.turretManual.readEagerly().withoutStamps
-
-    choreography {
-        runWhenever(
-            // carousel
-            { operator.xbox.pov == 270 } to {
-                carousel.set(carousel.hardware.nearestSlot() + 1.CarouselSlot,
-                    0.Degree)
-            },
-            { operator.xbox.pov == 90 } to { carousel.set(carousel.hardware.nearestSlot() - 1.CarouselSlot, 0.Degree) },
-
-            // intake
-            { operator.lb } to { intakeSlider?.set(IntakeSliderState.Out) },
-            { operator.lt } to { intakeRollers?.set(intakeRollers.eatSpeed) },
-            { operator.rt } to { intakeRollers?.set(-100.Percent) },
-
-            // flywheel
-            { operator.xbox.xButton } to { flywheel?.set(flywheel.presetAnitez) },
-
-            // turret
-            { !turretManual.isZero } to { turret?.manualOverride(operator) },
-            { operator.xbox.pov == 0 } to { turret?.set(0.Degree, 0.Degree) },
-
-            // feeder roller
-            { operator.xbox.aButton } to { feederRoller?.set(feederRoller.feedSpeed) },
-
-            // flashlight
-            { operator.xbox.bButton } to { flashlight?.set(FlashlightState.On) },
         )
     }
 }
@@ -175,13 +125,6 @@ suspend fun Subsystems.intakeBalls() = startChoreo("Intake Balls") {
     }
 }
 
-suspend fun Subsystems.visionTrackTarget() = startChoreo("Vision Aim Turret") {
-    choreography {
-        launch { flashlight?.set(FlashlightState.On) }
-        turret?.trackTarget(drivetrain, limelight)
-    }
-}
-
 suspend fun Subsystems.shootAll(speed: DutyCycle) = startChoreo("Shoot All") {
     choreography {
         val j = launch { shooterHood?.set(ShooterHoodState.Up) }
@@ -208,10 +151,7 @@ suspend fun Subsystems.spinUpShooter(flywheelPreset: AngularVelocity) {
         log(Error) { "Need flywheel and feeder to spin up shooter" }
         freeze()
     } else startChoreo("Spin Up Shooter") {
-        val reading by limelight.hardware.readings.readEagerly().withoutStamps
-
         val flywheelSpeed by flywheel.hardware.speed.readEagerly().withoutStamps
-        val shift by operator.shift.readEagerly().withoutStamps
 
         choreography {
             launch { feederRoller.set(0.Rpm) }
@@ -222,29 +162,9 @@ suspend fun Subsystems.spinUpShooter(flywheelPreset: AngularVelocity) {
             launch { feederRoller.set(feederRoller.feedSpeed) }
             launch { leds?.blink(Color.BLUE) }
 
-            var flywheelTarget = flywheelPreset
-
             launch { flywheel.set(flywheelPreset) }
-            launch {
-                while (isActive) {
-                    if (!shift) {
-                        val snapshot = reading?.copy()
-                        if (snapshot != null) {
-                            val target = targetFlywheelSpeed(flywheel, snapshot)
-                            if (target !in 5000.Rpm `±` 2000.Rpm) {
-                                log(Error) { "Calculated target (${target.Rpm} rpm) is too far off" }
-                            } else {
-                                flywheelTarget = target
-                                log(Debug) { "New target ${target.Rpm}" }
-                                launch { flywheel.set(target) }
-                            }
-                        }
-                    }
-                    delay(200.milli(Second)) // TODO idk how long
-                }
-            }
 
-            runWhenever({ flywheelSpeed in flywheelTarget `±` flywheel.tolerance } to {
+            runWhenever({ flywheelSpeed in flywheelPreset `±` flywheel.tolerance } to {
                 launch { leds?.set(Color.GREEN) }
                 rumble.set(100.Percent)
             })

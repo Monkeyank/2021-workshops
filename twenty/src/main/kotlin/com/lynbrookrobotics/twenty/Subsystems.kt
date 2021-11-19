@@ -73,7 +73,6 @@ class Subsystems(
             { auto5Ball(initialBearing, currentTime) },
         )
 
-        launch { turret?.trackTarget(drivetrain, limelight) }
         delay(AutoPrefs.initialDelay)
 
         when (autoId) {
