@@ -32,11 +32,6 @@ class TurretHardware : SubsystemHardware<TurretHardware, TurretComponent>() {
 
     val conversions = TurretConversions(this)
 
-//    var isZeroed = false
-//        set(value) {
-//            log(Debug) { "Setting isZeroed to $value" }
-//            field = value
-//        }
 
     private val escId = 52
 
